@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VTU Textbook Assistant</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Segoe UI, Arial, sans-serif; background: #f0f4fa; margin: 0; color: #1f2937; }
+    header { background: #1e3a8a; color: white; padding: 18px 24px; }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+    main { max-width: 820px; margin: 0 auto; padding: 20px 16px 130px; }
+    .msg { margin: 14px 0; padding: 14px 16px; border-radius: 12px; line-height: 1.55; }
+    .user { background: #dbeafe; margin-left: 15%; }
+    .bot { background: white; margin-right: 8%; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .sources { margin-top: 10px; font-size: 13px; color: #475569; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+    .badge { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 10px; margin: 2px 4px 2px 0; }
+    .controls { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #d1d5db; padding: 12px; }
+    .controls .inner { max-width: 820px; margin: 0 auto; display: flex; gap: 8px; flex-wrap: wrap; }
+    select, input, button { padding: 10px; font-size: 15px; border: 1px solid #cbd5e1; border-radius: 8px; }
+    input { flex: 1; min-width: 200px; }
+    button { background: #1e3a8a; color: white; border: none; cursor: pointer; }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>VTU Textbook Knowledge Assistant</h1>
+    <p>Answers come only from the selected VTU textbooks, with page references.</p>
+  </header>
+
+  <main id="chat">
+    <div class="msg bot">Hi! Pick a subject, ask a question from your textbook, and I'll answer with the book and page.</div>
+  </main>
+
+  <div class="controls">
+    <div class="inner">
+      <select id="subject">
+        <option value="">All subjects</option>
+        <option value="CN">Computer Networks</option>
+      </select>
+      <select id="style">
+        <option value="detailed">Detailed</option>
+        <option value="points">Key points</option>
+        <option value="definition">Definition</option>
+      </select>
+      <input id="q" placeholder="Ask a question from your textbook..." autocomplete="off">
+      <button id="btn" onclick="ask()">Ask</button>
+    </div>
+  </div>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("q");
+    const btn = document.getElementById("btn");
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") ask();
+    });
+
+    function esc(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function render(text) {
+      return esc(text)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\n/g, "<br>");
+    }
+
+    function addMsg(html, cls) {
+      const d = document.createElement("div");
+      d.className = "msg " + cls;
+      d.innerHTML = html;
+      chat.appendChild(d);
+      window.scrollTo(0, document.body.scrollHeight);
+      return d;
+    }
+
+    async function ask() {
+      const q = input.value.trim();
+      if (!q) return;
+      addMsg(esc(q), "user");
+      input.value = "";
+      btn.disabled = true;
+      const loading = addMsg("Searching the textbook...", "bot");
+
+      try {
+        const res = await fetch("/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: q,
+            subject: document.getElementById("subject").value,
+            style: document.getElementById("style").value
+          })
+        });
+        const data = await res.json();
+        let html = render(data.answer);
+        if (data.sources && data.sources.length) {
+          html += '<div class="sources">Sources: ' +
+            data.sources.map(function (s) {
+              return '<span class="badge">' + esc(s.book) + ' p.' + s.page + '</span>';
+            }).join("") + '</div>';
+        }
+        loading.innerHTML = html;
+      } catch (e) {
+        loading.innerHTML = "Could not reach the server. Is it running?";
+      }
+
+      btn.disabled = false;
+      input.focus();
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+  </script>
+</body>
+</html>
