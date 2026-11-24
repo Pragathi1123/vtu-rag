@@ -10,8 +10,14 @@ load_dotenv()
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 col = chromadb.PersistentClient(path="chroma_db").get_collection("vtu")
 llm = genai.Client(api_key=os.getenv("GEMINI_API_KEY"),
-                   http_options={"timeout": 30000})   # give up after 30 seconds
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+                   http_options={"timeout": 60000})   # give up after 60 seconds
+
+# Main model first, then backups used automatically if it is busy
+MODELS = [
+    os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
+]
 MAX_DIST = 0.55   # tune using your test results
 
 STYLES = {
@@ -20,12 +26,32 @@ STYLES = {
     "detailed": "Give a clear, detailed explanation suitable for exam answers.",
 }
 
+RETRY_CODES = ("503", "504", "429", "500", "DEADLINE", "UNAVAILABLE", "timed out", "Timeout")
+
 
 def retrieve(question, subject=None, k=5):
     emb = embedder.encode([question]).tolist()
     where = {"subject": subject} if subject else None
     r = col.query(query_embeddings=emb, n_results=k, where=where)
     return list(zip(r["documents"][0], r["metadatas"][0], r["distances"][0]))
+
+
+def ask_llm(prompt):
+    """Try each model in turn, with waits between rounds. Returns text or None."""
+    for round_no in range(3):
+        for model in MODELS:
+            try:
+                resp = llm.models.generate_content(model=model, contents=prompt)
+                return resp.text
+            except Exception as e:
+                msg = str(e)
+                if any(code in msg for code in RETRY_CODES):
+                    print(f"  ({model} busy, trying next...)", flush=True)
+                    continue
+                print("LLM error:", msg[:300])      # e.g. wrong model name or bad key
+                continue
+        time.sleep(8 * (round_no + 1))              # wait 8s, 16s, 24s between rounds
+    return None
 
 
 def answer(question, subject=None, style="detailed"):
@@ -48,23 +74,14 @@ CONTEXT:
 
 QUESTION: {question}"""
 
-    resp = None
-    for attempt in range(3):                      # try up to 3 times
-        try:
-            resp = llm.models.generate_content(model=MODEL, contents=prompt)
-            break
-        except Exception as e:
-            msg = str(e)
-            if ("503" in msg or "429" in msg) and attempt < 2:
-                time.sleep(3 * (attempt + 1))     # wait 3s, 6s, then retry
-                continue
-            print("LLM error:", msg[:300])
-            return {"answer": "The AI service is busy or unavailable right now. "
-                              "Please try again in a moment.",
-                    "sources": []}
+    text = ask_llm(prompt)
+    if text is None:
+        return {"answer": "The AI service is busy or unavailable right now. "
+                          "Please try again in a moment.",
+                "sources": []}
 
     sources = sorted({(m["book"], m["page"]) for _, m, _ in hits})
-    return {"answer": resp.text,
+    return {"answer": text,
             "sources": [{"book": b, "page": p} for b, p in sources]}
 
 

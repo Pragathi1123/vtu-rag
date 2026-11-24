@@ -1,0 +1,30 @@
+what is the OSI model
+what is the difference between OSI model and TCP/IP protocol suite
+what is the function of the data link layer
+what is IPv4 addressing
+what is subnetting
+what is the difference between TCP and UDP
+explain the three way handshake in TCP
+what is flow control
+what is error control
+explain CSMA/CD
+what is CSMA/CA
+how does DNS work
+what is the difference between a hub, switch and router
+what is ARP
+explain stop and wait protocol
+what is congestion control
+explain distance vector routing
+explain link state routing
+what is HTTP
+what is SMTP
+who won the IPL
+capital of France
+how to bake a chocolate cake
+what is the price of petrol
+write a python program to sort a list
+what is arp
+wat is subnetting
+explain tcp
+what is bandwidth
+difference between circuit switching and packet switching
