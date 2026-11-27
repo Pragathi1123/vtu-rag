@@ -13,3 +13,4 @@ while True:
     for text, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0]):
         print(f"\n--- {meta['book']} | page {meta['page']} | distance {dist:.3f}")
         print(text[:400])
+    
