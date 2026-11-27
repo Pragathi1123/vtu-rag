@@ -44,3 +44,4 @@ for f in os.listdir(PDF_DIR):
     print(f"Done: {f}")
 
 print("Total chunks in database:", col.count())
+# Updated PDF ingestion module
